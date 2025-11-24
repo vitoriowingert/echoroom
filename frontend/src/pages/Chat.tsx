@@ -18,6 +18,8 @@ import { MembersSidebar } from '../components/layout/MembersSidebar';
 import { MessageList } from '../components/chat/MessageList';
 import { MessageInput } from '../components/chat/MessageInput';
 import { SearchModal } from '../components/chat/SearchModal';
+import { PinnedMessagesModal } from '../components/chat/PinnedMessagesModal';
+import { HelpModal } from '../components/common/HelpModal';
 import { VoiceChannel } from '../components/voice/VoiceChannel';
 import { Room, Message } from '../types';
 
@@ -73,6 +75,10 @@ export function Chat() {
     token
   );
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isPinnedMessagesOpen, setIsPinnedMessagesOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isMembersSidebarOpen, setIsMembersSidebarOpen] = useState(true);
+  const [pinnedMessagesRefreshTrigger, setPinnedMessagesRefreshTrigger] = useState(0);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -344,12 +350,34 @@ export function Chat() {
         discoverServers={discoverServers}
         loading={roomsLoading || serversLoading}
         unreadCountsByRoom={unreadCountsByRoom}
+        onToggleMembers={() => setIsMembersSidebarOpen(!isMembersSidebarOpen)}
       />
 
       <div className="flex-1 flex flex-col bg-discord-gray min-w-0">
         <Header
           room={selectedRoom}
           onSearchClick={() => setIsSearchOpen(true)}
+          onPinClick={() => setIsPinnedMessagesOpen(true)}
+          onPhoneCallClick={() => {
+            if (selectedRoom) {
+              // Convert to voice channel or show voice call
+              alert('Voice call feature - Coming soon!');
+            }
+          }}
+          onVideoCallClick={() => {
+            if (selectedRoom) {
+              // Convert to video call or show video call
+              alert('Video call feature - Coming soon!');
+            }
+          }}
+          onAddUserClick={() => {
+            if (selectedServerId) {
+              // Show invite modal or add user modal
+              alert('Add user feature - Use server invite!');
+            }
+          }}
+          onMembersClick={() => setIsMembersSidebarOpen(!isMembersSidebarOpen)}
+          onHelpClick={() => setIsHelpOpen(true)}
           unreadCount={unreadCount}
           notifications={notifications}
           onMarkAllAsRead={markAllAsRead}
@@ -383,8 +411,15 @@ export function Chat() {
                 messages={messages}
                 users={messageUsers}
                 currentUserId={user.id}
+                roomId={selectedRoomId || undefined}
                 onEditMessage={handleUpdateMessage}
                 onDeleteMessage={handleDeleteMessage}
+                onPinMessage={(messageId) => {
+                  // Trigger refresh of pinned messages modal if it's open
+                  if (isPinnedMessagesOpen) {
+                    setPinnedMessagesRefreshTrigger((prev) => prev + 1);
+                  }
+                }}
               />
               <MessageInput
                 onSendMessage={handleSendMessage}
@@ -405,7 +440,7 @@ export function Chat() {
         )}
       </div>
 
-      {selectedRoomId && (
+      {selectedRoomId && isMembersSidebarOpen && (
         <MembersSidebar members={onlineMembers} loading={membersLoading} />
       )}
 
@@ -428,6 +463,28 @@ export function Chat() {
           }
         }}
       />
+
+      <PinnedMessagesModal
+        isOpen={isPinnedMessagesOpen}
+        onClose={() => setIsPinnedMessagesOpen(false)}
+        roomId={selectedRoomId}
+        token={token}
+        users={messageUsers}
+        refreshTrigger={pinnedMessagesRefreshTrigger}
+        onMessageClick={(messageId) => {
+          // Scroll to message in chat
+          const element = document.querySelector(`[data-message-id="${messageId}"]`);
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            element.classList.add('highlight-message');
+            setTimeout(() => {
+              element.classList.remove('highlight-message');
+            }, 2000);
+          }
+        }}
+      />
+
+      <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
     </div>
   );
 }

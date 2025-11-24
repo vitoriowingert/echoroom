@@ -1,4 +1,4 @@
-import { useState, FormEvent, KeyboardEvent, useRef, ChangeEvent } from 'react';
+import { useState, FormEvent, KeyboardEvent, useRef, ChangeEvent, useEffect } from 'react';
 import { useTranslation } from '../../i18n/useTranslation';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -19,8 +19,34 @@ export function MessageInput({ onSendMessage, roomId, disabled }: MessageInputPr
   const [content, setContent] = useState('');
   const [files, setFiles] = useState<FilePreview[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
   const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
+  // Common emojis
+  const commonEmojis = ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚', '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩', '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣', '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬', '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗', '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯', '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐', '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈', '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾', '🤖', '🎃', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showEmojiPicker]);
+
+  const insertEmoji = (emoji: string) => {
+    setContent((prev) => prev + emoji);
+    setShowEmojiPicker(false);
+  };
 
   const handleFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -226,6 +252,10 @@ export function MessageInput({ onSendMessage, roomId, disabled }: MessageInputPr
             {/* Gift */}
             <button
               type="button"
+              onClick={() => {
+                // Insert gift emoji or show gift modal
+                insertEmoji('🎁');
+              }}
               className="p-1.5 text-discord-gray-lighter hover:text-white hover:bg-discord-gray rounded transition-colors"
               title="Enviar presente"
             >
@@ -238,6 +268,10 @@ export function MessageInput({ onSendMessage, roomId, disabled }: MessageInputPr
             {/* GIF */}
             <button
               type="button"
+              onClick={() => {
+                // Show GIF picker (placeholder)
+                alert('GIF picker - Coming soon! Use Tenor API or similar service.');
+              }}
               className="px-2 py-1 text-discord-gray-lighter hover:text-white hover:bg-discord-gray rounded transition-colors font-semibold text-xs"
               title="GIF"
             >
@@ -245,19 +279,43 @@ export function MessageInput({ onSendMessage, roomId, disabled }: MessageInputPr
             </button>
             
             {/* Emoji */}
-            <button
-              type="button"
-              className="p-1.5 text-discord-gray-lighter hover:text-white hover:bg-discord-gray rounded transition-colors"
-              title="Emoji"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z" clipRule="evenodd" />
-              </svg>
-            </button>
+            <div className="relative" ref={emojiPickerRef}>
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="p-1.5 text-discord-gray-lighter hover:text-white hover:bg-discord-gray rounded transition-colors"
+                title="Emoji"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z" clipRule="evenodd" />
+                </svg>
+              </button>
+              {showEmojiPicker && (
+                <div className="absolute bottom-full right-0 mb-2 bg-discord-dark border border-discord-gray-light rounded-lg shadow-xl p-3 w-64 max-h-64 overflow-y-auto scrollbar-thin z-50">
+                  <div className="grid grid-cols-8 gap-1">
+                    {commonEmojis.map((emoji, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => insertEmoji(emoji)}
+                        className="p-1 hover:bg-discord-gray rounded text-lg transition-colors"
+                        title={emoji}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             
             {/* Sticker */}
             <button
               type="button"
+              onClick={() => {
+                // Show sticker picker (placeholder)
+                alert('Sticker picker - Coming soon!');
+              }}
               className="p-1.5 text-discord-gray-lighter hover:text-white hover:bg-discord-gray rounded transition-colors"
               title="Adesivos"
             >

@@ -14,6 +14,8 @@ interface MessageItemProps {
   showUsername: boolean;
   onEdit?: (messageId: string, content: string) => void;
   onDelete?: (messageId: string) => void;
+  onPin?: (messageId: string) => void;
+  roomId?: string;
 }
 
 export function MessageItem({
@@ -24,6 +26,8 @@ export function MessageItem({
   showUsername,
   onEdit,
   onDelete,
+  onPin,
+  roomId,
 }: MessageItemProps) {
   const { t } = useTranslation();
   const { socket } = useSocket();
@@ -75,6 +79,29 @@ export function MessageItem({
   const handleDelete = () => {
     if (onDelete && confirm(t.chat.confirmDelete)) {
       onDelete(message.id);
+    }
+  };
+
+  const handlePin = async () => {
+    if (!onPin || !token || !roomId) return;
+    
+    try {
+      const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/pins/messages/${message.id}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to pin message');
+      }
+
+      onPin(message.id);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to pin message');
     }
   };
 
@@ -211,28 +238,41 @@ export function MessageItem({
               token={token}
             />
           )}
-          {isOwn && onEdit && onDelete && (
-            <div className="flex items-center gap-1 opacity-0 group-hover/message-item:opacity-100 transition-opacity flex-shrink-0">
+          <div className="flex items-center gap-1 opacity-0 group-hover/message-item:opacity-100 transition-opacity flex-shrink-0">
+            {onPin && roomId && token && (
               <button
-                onClick={() => setIsEditing(true)}
+                onClick={handlePin}
                 className="p-1 text-discord-gray-lighter hover:text-white hover:bg-discord-gray-light rounded transition-colors"
-                title={t.chat.edit}
+                title="Pin message"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
                 </svg>
               </button>
-              <button
-                onClick={handleDelete}
-                className="p-1 text-discord-gray-lighter hover:text-red-400 hover:bg-discord-gray-light rounded transition-colors"
-                title={t.chat.delete}
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </div>
-          )}
+            )}
+            {isOwn && onEdit && onDelete && (
+              <>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="p-1 text-discord-gray-lighter hover:text-white hover:bg-discord-gray-light rounded transition-colors"
+                  title={t.chat.edit}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="p-1 text-discord-gray-lighter hover:text-red-400 hover:bg-discord-gray-light rounded transition-colors"
+                  title={t.chat.delete}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

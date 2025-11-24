@@ -19,6 +19,7 @@ interface SidebarProps {
   onCreateRoom: (name: string, description?: string, serverId?: string) => Promise<void>;
   onJoinServer: (serverId: string) => Promise<void>;
   discoverServers: () => Promise<Array<Server & { isMember: boolean }>>;
+  onToggleMembers?: () => void;
   loading?: boolean;
   unreadCountsByRoom?: Record<string, number>;
 }
@@ -34,6 +35,7 @@ export function Sidebar({
   onCreateRoom,
   onJoinServer,
   discoverServers,
+  onToggleMembers,
   loading,
   unreadCountsByRoom,
 }: SidebarProps) {
@@ -136,7 +138,7 @@ export function Sidebar({
       <div className="w-60 bg-discord-dark flex flex-col h-full select-none">
         {/* Server Header */}
         {selectedServer ? (
-          <div className="h-12 px-4 border-b border-discord-gray-light flex items-center justify-between shadow-sm hover:bg-discord-gray/50 transition-colors cursor-pointer">
+          <div className="h-12 px-4 border-b border-discord-gray-light flex items-center justify-between shadow-sm hover:bg-discord-gray/50 transition-colors">
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <h2 className="text-white font-semibold text-base truncate">{selectedServer.name}</h2>
               <button className="flex-shrink-0 text-discord-gray-lighter hover:text-white transition-colors">
@@ -145,6 +147,15 @@ export function Sidebar({
                 </svg>
               </button>
             </div>
+            <button
+              onClick={() => setIsInviteModalOpen(true)}
+              className="flex-shrink-0 text-discord-gray-lighter hover:text-white transition-colors p-1"
+              title="Invite people"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z" />
+              </svg>
+            </button>
           </div>
         ) : (
           <div className="h-12 px-4 border-b border-discord-gray-light flex items-center justify-between shadow-sm">
@@ -188,6 +199,7 @@ export function Sidebar({
                     rooms={rooms}
                     selectedRoomId={selectedRoomId}
                     onSelectRoom={onSelectRoom}
+                    onToggleMembers={onToggleMembers}
                     unreadCountsByRoom={unreadCountsByRoom}
                   />
                 </>

@@ -18,6 +18,12 @@ interface NotificationItem {
 interface HeaderProps {
   room: Room | null;
   onSearchClick?: () => void;
+  onPinClick?: () => void;
+  onPhoneCallClick?: () => void;
+  onVideoCallClick?: () => void;
+  onAddUserClick?: () => void;
+  onMembersClick?: () => void;
+  onHelpClick?: () => void;
   unreadCount?: number;
   notifications?: NotificationItem[];
   onMarkAllAsRead?: () => void;
@@ -27,6 +33,12 @@ interface HeaderProps {
 export function Header({
   room,
   onSearchClick,
+  onPinClick,
+  onPhoneCallClick,
+  onVideoCallClick,
+  onAddUserClick,
+  onMembersClick,
+  onHelpClick,
   unreadCount = 0,
   notifications = [],
   onMarkAllAsRead,
@@ -65,6 +77,7 @@ export function Header({
           <>
             {/* Phone call */}
             <button
+              onClick={onPhoneCallClick}
               className="p-1.5 hover:bg-discord-gray-light rounded transition-colors text-discord-gray-lighter hover:text-white"
               title="Iniciar chamada de voz"
             >
@@ -75,6 +88,7 @@ export function Header({
             
             {/* Video call */}
             <button
+              onClick={onVideoCallClick}
               className="p-1.5 hover:bg-discord-gray-light rounded transition-colors text-discord-gray-lighter hover:text-white"
               title="Iniciar chamada de vídeo"
             >
@@ -85,6 +99,7 @@ export function Header({
             
             {/* Pin */}
             <button
+              onClick={onPinClick}
               className="p-1.5 hover:bg-discord-gray-light rounded transition-colors text-discord-gray-lighter hover:text-white"
               title="Mensagens fixadas"
             >
@@ -95,6 +110,7 @@ export function Header({
             
             {/* Add user */}
             <button
+              onClick={onAddUserClick}
               className="p-1.5 hover:bg-discord-gray-light rounded transition-colors text-discord-gray-lighter hover:text-white"
               title="Adicionar amigos ao grupo"
             >
@@ -105,6 +121,7 @@ export function Header({
             
             {/* People/Group */}
             <button
+              onClick={onMembersClick}
               className="p-1.5 hover:bg-discord-gray-light rounded transition-colors text-discord-gray-lighter hover:text-white"
               title="Membros do grupo"
             >
@@ -181,6 +198,7 @@ export function Header({
         
         {/* Help/Question mark */}
         <button
+          onClick={onHelpClick}
           className="p-1.5 hover:bg-discord-gray-light rounded transition-colors text-discord-gray-lighter hover:text-white"
           title="Ajuda"
         >

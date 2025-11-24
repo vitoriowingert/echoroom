@@ -1,16 +1,20 @@
 import { Room, ChannelType } from '../../types';
 import { useTranslation } from '../../i18n/useTranslation';
 import { CollapsibleCategory } from './CollapsibleCategory';
+import { ChannelSettingsModal } from './ChannelSettingsModal';
+import { useState } from 'react';
 
 interface RoomListProps {
   rooms: Room[];
   selectedRoomId: string | null;
   onSelectRoom: (roomId: string) => void;
+  onToggleMembers?: () => void;
   unreadCountsByRoom?: Record<string, number>;
 }
 
-export function RoomList({ rooms, selectedRoomId, onSelectRoom, unreadCountsByRoom }: RoomListProps) {
+export function RoomList({ rooms, selectedRoomId, onSelectRoom, onToggleMembers, unreadCountsByRoom }: RoomListProps) {
   const { t } = useTranslation();
+  const [settingsRoom, setSettingsRoom] = useState<Room | null>(null);
   
   // Remove duplicates by ID first (safety measure)
   const uniqueRooms = Array.from(
@@ -107,7 +111,7 @@ export function RoomList({ rooms, selectedRoomId, onSelectRoom, unreadCountsByRo
               title="Membros"
               onClick={(e) => {
                 e.stopPropagation();
-                // TODO: Open members list
+                onToggleMembers?.();
               }}
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -119,7 +123,7 @@ export function RoomList({ rooms, selectedRoomId, onSelectRoom, unreadCountsByRo
               title="Configurações do canal"
               onClick={(e) => {
                 e.stopPropagation();
-                // TODO: Open channel settings
+                setSettingsRoom(room);
               }}
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -186,6 +190,16 @@ export function RoomList({ rooms, selectedRoomId, onSelectRoom, unreadCountsByRo
           )}
         </>
       )}
+
+      <ChannelSettingsModal
+        isOpen={settingsRoom !== null}
+        onClose={() => setSettingsRoom(null)}
+        room={settingsRoom}
+        onUpdate={() => {
+          // Room list will refresh automatically via parent component
+          setSettingsRoom(null);
+        }}
+      />
     </div>
   );
 }

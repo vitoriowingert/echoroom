@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTranslation } from '../../i18n/useTranslation';
+import { useGlobalVoiceState } from '../../hooks/useGlobalVoiceState';
 import { ProfileModal } from '../profile/ProfileModal';
 
 export function UserProfile() {
   const { user } = useAuth();
   const { t } = useTranslation();
+  const { isMuted, isDeafened, isInVoiceChannel, toggleMute, toggleDeafen } = useGlobalVoiceState();
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   if (!user) return null;
@@ -59,18 +61,40 @@ export function UserProfile() {
       <div className="flex items-center gap-0.5">
         {/* Microphone */}
         <button
-          className="p-1.5 hover:bg-discord-gray-light rounded transition-colors text-discord-gray-lighter hover:text-white"
-          title="Microfone"
+          onClick={isDeafened ? toggleDeafen : toggleMute}
+          className={`p-1.5 hover:bg-discord-gray-light rounded transition-colors ${
+            isMuted || isDeafened
+              ? 'text-discord-red hover:text-red-400'
+              : 'text-discord-gray-lighter hover:text-white'
+          } ${!isInVoiceChannel ? 'opacity-50 cursor-not-allowed' : ''}`}
+          title={
+            isDeafened
+              ? 'Undeafen (also unmutes)'
+              : isMuted
+              ? 'Unmute'
+              : 'Mute'
+          }
+          disabled={!isInVoiceChannel}
         >
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
+            {isMuted || isDeafened ? (
+              <path fillRule="evenodd" d="M13.477 14.89A6 6 0 015.11 6.524l8.367 8.368zm1.414-1.414L6.524 5.11a6 6 0 017.367 7.367zM18 10a8 8 0 11-16 0 8 8 0 0116 0z" clipRule="evenodd" />
+            ) : (
+              <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
+            )}
           </svg>
         </button>
         
         {/* Headphones */}
         <button
-          className="p-1.5 hover:bg-discord-gray-light rounded transition-colors text-discord-gray-lighter hover:text-white"
-          title="Fones de ouvido"
+          onClick={toggleDeafen}
+          className={`p-1.5 hover:bg-discord-gray-light rounded transition-colors ${
+            isDeafened
+              ? 'text-discord-red hover:text-red-400'
+              : 'text-discord-gray-lighter hover:text-white'
+          } ${!isInVoiceChannel ? 'opacity-50 cursor-not-allowed' : ''}`}
+          title={isDeafened ? 'Undeafen' : 'Deafen'}
+          disabled={!isInVoiceChannel}
         >
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" />

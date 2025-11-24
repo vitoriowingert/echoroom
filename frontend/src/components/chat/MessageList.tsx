@@ -7,16 +7,20 @@ interface MessageListProps {
   messages: Message[];
   users: Map<string, User>;
   currentUserId: string;
+  roomId?: string;
   onEditMessage?: (messageId: string, content: string) => void;
   onDeleteMessage?: (messageId: string) => void;
+  onPinMessage?: (messageId: string) => void;
 }
 
 export function MessageList({
   messages,
   users,
   currentUserId,
+  roomId,
   onEditMessage,
   onDeleteMessage,
+  onPinMessage,
 }: MessageListProps) {
   const { t } = useTranslation();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -133,6 +137,8 @@ export function MessageList({
                 showUsername={showUsername}
                 onEdit={onEditMessage}
                 onDelete={onDeleteMessage}
+                onPin={onPinMessage}
+                roomId={roomId}
               />
             </div>
           );
