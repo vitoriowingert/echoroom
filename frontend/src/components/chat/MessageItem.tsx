@@ -83,14 +83,20 @@ export function MessageItem({
   };
 
   const handlePin = async () => {
-    if (!onPin || !token || !roomId) return;
+    if (!onPin || !roomId) return;
     
     try {
+      // Always get a fresh token before making the request
+      const freshToken = await getToken();
+      if (!freshToken) {
+        throw new Error('Not authenticated');
+      }
+      
       const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
       const response = await fetch(`${API_URL}/api/pins/messages/${message.id}`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${freshToken}`,
         },
       });
 

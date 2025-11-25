@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProfile } from '../../hooks/useProfile';
 import { useAuth } from '../../hooks/useAuth';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -10,7 +11,8 @@ interface ProfileModalProps {
 }
 
 export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
-  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const { profile, loading, updateProfile, updating } = useProfile();
   const { t, setLanguage } = useTranslation();
   const [username, setUsername] = useState('');
@@ -439,21 +441,47 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 </div>
 
                 {/* Actions */}
-                <div className="flex justify-end gap-3 pt-4 border-t border-discord-gray-light">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="px-6 py-2 bg-discord-gray-light hover:bg-discord-gray-lighter text-white rounded-lg transition-colors"
-                  >
-                    {t.profile.cancel}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={updating}
-                    className="px-6 py-2 bg-discord-blue hover:bg-discord-blue-hover text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {updating ? t.profile.saving : t.profile.saveChanges}
-                  </button>
+                <div className="space-y-4 pt-4 border-t border-discord-gray-light">
+                  <div className="flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="px-6 py-2 bg-discord-gray-light hover:bg-discord-gray-lighter text-white rounded-lg transition-colors"
+                    >
+                      {t.profile.cancel}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={updating}
+                      className="px-6 py-2 bg-discord-blue hover:bg-discord-blue-hover text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {updating ? t.profile.saving : t.profile.saveChanges}
+                    </button>
+                  </div>
+                  
+                  {/* Logout Section */}
+                  <div className="pt-4 border-t border-discord-gray-light">
+                    <div className="bg-discord-dark rounded-lg p-4">
+                      <h3 className="text-sm font-semibold text-white mb-2">{t.profile.myAccount}</h3>
+                      <p className="text-xs text-discord-gray-lighter mb-4">
+                        Sign out of your account. You'll need to sign in again to access your account.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await signOut();
+                            navigate('/login');
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : 'Failed to sign out');
+                          }
+                        }}
+                        className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors font-medium"
+                      >
+                        {t.auth.signOut}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </form>
             </>

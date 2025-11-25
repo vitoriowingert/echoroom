@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useInvites } from '../../hooks/useInvites';
 import { useAuth } from '../../hooks/useAuth';
 import { ServerInvite } from '../../types';
@@ -13,17 +13,50 @@ interface InviteModalProps {
 export function InviteModal({ isOpen, onClose, serverId, onInviteCreated }: InviteModalProps) {
   const { getToken } = useAuth();
   const [token, setToken] = useState<string | null>(null);
-  const { invites, loading, createInvite, deleteInvite } = useInvites(token, serverId);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const { invites, loading, fetchInvites } = useInvites(token, serverId);
   const [expiresIn, setExpiresIn] = useState<number>(7); // days
   const [maxUses, setMaxUses] = useState<number | undefined>(undefined);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
-      getToken().then(setToken).catch(console.error);
+      getToken().then((t) => {
+        if (isMountedRef.current) {
+          setToken(t);
+        }
+      }).catch(console.error);
     }
   }, [isOpen, getToken]);
+
+  // Trigger refresh when refreshTrigger changes
+  useEffect(() => {
+    if (refreshTrigger > 0 && isMountedRef.current) {
+      // Use fresh token when refreshing after create/delete
+      // Create async function to properly await fetchInvites
+      const refreshInvites = async () => {
+        try {
+          await fetchInvites(true);
+        } catch (err) {
+          // Only log error if component is still mounted
+          if (isMountedRef.current) {
+            console.error('Error refreshing invites:', err);
+          }
+        }
+      };
+      
+      refreshInvites();
+    }
+  }, [refreshTrigger, fetchInvites]);
 
   if (!isOpen) return null;
 
@@ -32,9 +65,38 @@ export function InviteModal({ isOpen, onClose, serverId, onInviteCreated }: Invi
     setCreating(true);
 
     try {
+      // Always get a fresh token before making the request
+      const freshToken = await getToken();
+      if (!freshToken) {
+        throw new Error('Not authenticated');
+      }
+      
       const expiresAt = expiresIn > 0 ? new Date(Date.now() + expiresIn * 24 * 60 * 60 * 1000) : undefined;
-      const invite = await createInvite(serverId, expiresAt, maxUses);
+      
+      // Use fresh token directly instead of relying on useInvites hook
+      const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/invites/servers/${serverId}/invites`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${freshToken}`,
+        },
+        body: JSON.stringify({
+          expiresAt: expiresAt?.toISOString(),
+          maxUses,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha ao criar convite');
+      }
+
+      const invite = await response.json();
       onInviteCreated?.(invite);
+      
+      // Refresh invites list by triggering refresh
+      setRefreshTrigger((prev) => prev + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao criar convite');
     } finally {
@@ -48,7 +110,28 @@ export function InviteModal({ isOpen, onClose, serverId, onInviteCreated }: Invi
     }
 
     try {
-      await deleteInvite(inviteId);
+      // Always get a fresh token before making the request
+      const freshToken = await getToken();
+      if (!freshToken) {
+        throw new Error('Not authenticated');
+      }
+      
+      // Use fresh token directly instead of relying on useInvites hook
+      const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/invites/${inviteId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${freshToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha ao deletar convite');
+      }
+      
+      // Refresh invites list by triggering refresh
+      setRefreshTrigger((prev) => prev + 1);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao deletar convite');
     }

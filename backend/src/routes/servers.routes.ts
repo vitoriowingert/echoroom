@@ -10,7 +10,7 @@ import {
   joinServer,
   leaveServer,
 } from '../controllers/servers.controller';
-import { getRoomsByServer } from '../controllers/rooms.controller';
+import { getRoomsByServer, createRoomForServer } from '../controllers/rooms.controller';
 
 const router = Router();
 
@@ -20,12 +20,14 @@ router.use(authenticateToken);
 router.post('/', createServer);
 router.get('/user', getUserServers);
 router.get('/discover', getAllServers);
-router.get('/:id', getServer);
+// More specific routes must come before general /:id route
 router.get('/:id/rooms', getRoomsByServer);
-router.put('/:id', updateServer);
-router.delete('/:id', deleteServer);
+router.post('/:id/rooms', createRoomForServer);
 router.post('/:id/join', joinServer);
 router.post('/:id/leave', leaveServer);
+router.get('/:id', getServer);
+router.put('/:id', updateServer);
+router.delete('/:id', deleteServer);
 
 export default router;
 

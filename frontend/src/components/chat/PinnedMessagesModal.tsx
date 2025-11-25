@@ -7,7 +7,6 @@ interface PinnedMessagesModalProps {
   isOpen: boolean;
   onClose: () => void;
   roomId: string | null;
-  token: string | null;
   users: Map<string, User>;
   onMessageClick?: (messageId: string) => void;
   refreshTrigger?: number;
@@ -22,7 +21,6 @@ export function PinnedMessagesModal({
   isOpen,
   onClose,
   roomId,
-  token,
   users,
   onMessageClick,
   refreshTrigger,
@@ -34,21 +32,27 @@ export function PinnedMessagesModal({
   const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
   useEffect(() => {
-    if (isOpen && roomId && token) {
+    if (isOpen && roomId) {
       fetchPinnedMessages();
     }
-  }, [isOpen, roomId, token, refreshTrigger]);
+  }, [isOpen, roomId, refreshTrigger]);
 
   const fetchPinnedMessages = async () => {
-    if (!roomId || !token) return;
+    if (!roomId) return;
 
     setLoading(true);
     setError(null);
 
     try {
+      // Always get a fresh token before making the request
+      const freshToken = await getToken();
+      if (!freshToken) {
+        throw new Error('Not authenticated');
+      }
+
       const response = await fetch(`${API_URL}/api/pins/rooms/${roomId}`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${freshToken}`,
         },
       });
 
@@ -66,13 +70,17 @@ export function PinnedMessagesModal({
   };
 
   const handleUnpin = async (messageId: string) => {
-    if (!token) return;
-
     try {
+      // Always get a fresh token before making the request
+      const freshToken = await getToken();
+      if (!freshToken) {
+        throw new Error('Not authenticated');
+      }
+
       const response = await fetch(`${API_URL}/api/pins/messages/${messageId}`, {
         method: 'DELETE',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${freshToken}`,
         },
       });
 

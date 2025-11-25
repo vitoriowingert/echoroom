@@ -1,44 +1,61 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Server } from '../types';
+import { useAuth } from './useAuth';
 
 export function useServers(token: string | null) {
+  const { getToken } = useAuth();
   const [servers, setServers] = useState<Server[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!token) {
+  const fetchServers = useCallback(async (currentToken: string = token!) => {
+    if (!currentToken) {
       setServers([]);
       setLoading(false);
       return;
     }
 
-    const fetchServers = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/servers/user`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+    setLoading(true);
+    setError(null);
 
-        if (!response.ok) {
-          throw new Error('Failed to fetch servers');
+    try {
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/servers/user`, {
+        headers: {
+          Authorization: `Bearer ${currentToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        // If token expired, try to get a fresh one and retry once
+        if (response.status === 401) {
+          const freshToken = await getToken();
+          if (freshToken && freshToken !== currentToken) {
+            // Retry with fresh token - await to ensure finally executes after retry completes
+            await fetchServers(freshToken);
+            return;
+          }
         }
-
-        const data = await response.json();
-        setServers(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch servers');
-        console.error('Error fetching servers:', err);
-      } finally {
-        setLoading(false);
+        throw new Error('Failed to fetch servers');
       }
-    };
 
-    fetchServers();
-  }, [token]);
+      const data = await response.json();
+      setServers(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch servers');
+      console.error('Error fetching servers:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, getToken]);
+
+  useEffect(() => {
+    if (token) {
+      fetchServers(token);
+    } else {
+      setServers([]);
+      setLoading(false);
+    }
+  }, [token, fetchServers]);
 
   const createServer = async (name: string, description?: string, iconUrl?: string): Promise<Server> => {
     if (!token) {
@@ -128,6 +145,6 @@ export function useServers(token: string | null) {
     return await response.json();
   };
 
-  return { servers, loading, error, createServer, joinServer, discoverServers };
+  return { servers, loading, error, createServer, joinServer, discoverServers, fetchServers };
 }
 

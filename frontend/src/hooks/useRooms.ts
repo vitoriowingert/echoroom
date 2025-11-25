@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { Room } from '../types';
+import { useAuth } from './useAuth';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 export function useRooms(token: string | null, serverId?: string | null) {
+  const { getToken } = useAuth();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isFetchingRef = useRef(false);
 
-  const fetchRooms = async () => {
-    if (!token) {
+  const fetchRooms = async (currentToken: string | null = token) => {
+    if (!currentToken) {
       setLoading(false);
       return;
     }
@@ -33,12 +35,20 @@ export function useRooms(token: string | null, serverId?: string | null) {
 
       const response = await fetch(url, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${currentToken}`,
         },
       });
 
       if (!response.ok) {
+        // If token expired, try to get a fresh one and retry once
         if (response.status === 401) {
+          const freshToken = await getToken();
+          if (freshToken && freshToken !== currentToken) {
+            // Retry with fresh token - await to ensure finally executes after retry completes
+            isFetchingRef.current = false;
+            await fetchRooms(freshToken);
+            return;
+          }
           setError('Sessão expirada. Por favor, faça login novamente.');
           setRooms([]);
         } else {
@@ -66,7 +76,7 @@ export function useRooms(token: string | null, serverId?: string | null) {
 
   useEffect(() => {
     if (token) {
-      fetchRooms();
+      fetchRooms(token);
     }
   }, [token, serverId]);
 
@@ -98,7 +108,7 @@ export function useRooms(token: string | null, serverId?: string | null) {
       const room = await response.json();
       // Refetch rooms to ensure consistency with server and avoid duplicates
       // This is better than manually adding to prevent race conditions
-      await fetchRooms();
+      await fetchRooms(token);
       return room;
     } catch (err) {
       // Handle network errors and other fetch failures

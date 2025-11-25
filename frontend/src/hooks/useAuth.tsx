@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '../config/supabase';
 import { User as AppUser } from '../types';
@@ -31,11 +31,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // Update user state based on session and event
       if (session?.user) {
+        // Always update user when we have a valid session
         setUser(mapSupabaseUser(session.user));
       } else {
-        setUser(null);
+        // Only clear user on explicit sign out
+        // This prevents logout when refresh temporarily fails or other transient errors
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+        // For all other events without session, preserve current user state
+        // This prevents accidental logout from refresh failures
       }
       setLoading(false);
     });
@@ -87,32 +95,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
-  const getToken = async (): Promise<string | null> => {
+  const getToken = useCallback(async (): Promise<string | null> => {
     try {
-      // First try to get the current session
-      let {
+      // First, try to get the current session
+      const {
         data: { session },
       } = await supabase.auth.getSession();
 
-      // If no session or session is expired, try to refresh
-      if (!session || !session.access_token) {
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        if (!refreshError && refreshData.session) {
-          session = refreshData.session;
+      if (session?.access_token) {
+        // Check if token is close to expiring (within 5 minutes)
+        const expiresAt = session.expires_at;
+        if (expiresAt) {
+          const expiresIn = expiresAt - Math.floor(Date.now() / 1000);
+          // Only refresh if token expires within 5 minutes
+          if (expiresIn < 300) {
+            // Token is close to expiring, try to refresh
+            try {
+              const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+              if (!refreshError && refreshData.session?.access_token) {
+                return refreshData.session.access_token;
+              }
+            } catch (refreshError) {
+              // If refresh fails, use current token
+              console.warn('Failed to refresh session, using current token:', refreshError);
+            }
+          }
         }
+        return session.access_token;
       }
 
-      // If still no valid session, return null
-      if (!session?.access_token) {
-        return null;
+      // No session available, try to refresh in case there's a refresh token
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (!refreshError && refreshData.session?.access_token) {
+        return refreshData.session.access_token;
       }
 
-      return session.access_token;
+      // No valid session available
+      return null;
     } catch (error) {
       console.error('Error getting token:', error);
-      return null;
+      // Fallback: try to get current session even if refresh failed
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        return session?.access_token || null;
+      } catch (fallbackError) {
+        console.error('Error getting session as fallback:', fallbackError);
+        return null;
+      }
     }
-  };
+  }, []);
 
   const refreshUser = async (): Promise<void> => {
     const {

@@ -25,7 +25,7 @@ export function useProfile() {
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchProfile = async () => {
+  const fetchProfile = async (currentToken?: string | null) => {
     if (!user) {
       setProfile(null);
       setLoading(false);
@@ -36,7 +36,7 @@ export function useProfile() {
     setError(null);
 
     try {
-      const token = await getToken();
+      const token = currentToken ?? await getToken();
       if (!token) {
         setError('Not authenticated');
         setProfile(null);
@@ -44,11 +44,24 @@ export function useProfile() {
         return;
       }
 
-      const response = await fetch(`${API_URL}/api/users/me`, {
+      let response = await fetch(`${API_URL}/api/users/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+
+      // If token expired, try to get a fresh one and retry once
+      if (response.status === 401) {
+        const freshToken = await getToken();
+        if (freshToken && freshToken !== token) {
+          // Retry with fresh token
+          response = await fetch(`${API_URL}/api/users/me`, {
+            headers: {
+              Authorization: `Bearer ${freshToken}`,
+            },
+          });
+        }
+      }
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -88,7 +101,7 @@ export function useProfile() {
         throw new Error('Not authenticated');
       }
 
-      const response = await fetch(`${API_URL}/api/users/me`, {
+      let response = await fetch(`${API_URL}/api/users/me`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -96,6 +109,22 @@ export function useProfile() {
         },
         body: JSON.stringify(updates),
       });
+
+      // If token expired, try to get a fresh one and retry once
+      if (response.status === 401) {
+        const freshToken = await getToken();
+        if (freshToken && freshToken !== token) {
+          // Retry with fresh token
+          response = await fetch(`${API_URL}/api/users/me`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${freshToken}`,
+            },
+            body: JSON.stringify(updates),
+          });
+        }
+      }
 
       if (!response.ok) {
         const errorData = await response.json();

@@ -1,15 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ServerInvite } from '../types';
+import { useAuth } from './useAuth';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 export function useInvites(token: string | null, serverId?: string | null) {
+  const { getToken } = useAuth();
   const [invites, setInvites] = useState<ServerInvite[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchInvites = async () => {
-    if (!token || !serverId) {
+  const fetchInvites = useCallback(async (useFreshToken = false) => {
+    if (!serverId) {
+      setInvites([]);
+      return;
+    }
+
+    // Get token - use fresh token if requested, otherwise use provided token
+    const currentToken = useFreshToken ? await getToken() : token;
+    if (!currentToken) {
       setInvites([]);
       return;
     }
@@ -20,11 +29,20 @@ export function useInvites(token: string | null, serverId?: string | null) {
     try {
       const response = await fetch(`${API_URL}/api/invites/servers/${serverId}/invites`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${currentToken}`,
         },
       });
 
       if (!response.ok) {
+        // If token expired and we haven't tried fresh token yet, retry with fresh token
+        if (response.status === 401 && !useFreshToken) {
+          const freshToken = await getToken();
+          if (freshToken && freshToken !== currentToken) {
+            // Retry with fresh token - await to ensure finally executes after retry completes
+            await fetchInvites(true);
+            return;
+          }
+        }
         if (response.status === 401) {
           setError('Sessão expirada. Por favor, faça login novamente.');
           setInvites([]);
@@ -42,13 +60,13 @@ export function useInvites(token: string | null, serverId?: string | null) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [serverId, token, getToken]);
 
   useEffect(() => {
     if (token && serverId) {
-      fetchInvites();
+      fetchInvites(false);
     }
-  }, [token, serverId]);
+  }, [token, serverId, fetchInvites]);
 
   const createInvite = async (
     serverId: string,

@@ -557,16 +557,55 @@ export class SupabaseService {
   }
 
   async getUserRooms(userId: string): Promise<Room[]> {
-    const { data, error } = await supabaseAdminClient
+    // Get rooms where user is an explicit member
+    const { data: memberRooms, error: memberError } = await supabaseAdminClient
       .from('room_members')
       .select('rooms(*)')
       .eq('user_id', userId);
 
-    if (error) {
-      throw parseDatabaseError(error, `Failed to get rooms for user ${userId}`);
+    if (memberError) {
+      throw parseDatabaseError(memberError, `Failed to get rooms for user ${userId}`);
     }
 
-    return (data?.map((item: { rooms: Room }) => item.rooms) || []) as Room[];
+    // Get server IDs where user is a member
+    const { data: serverMembers, error: serverError } = await supabaseAdminClient
+      .from('server_members')
+      .select('server_id')
+      .eq('user_id', userId);
+
+    if (serverError) {
+      throw parseDatabaseError(serverError, `Failed to get server memberships for user ${userId}`);
+    }
+
+    const serverIds = serverMembers?.map((m: { server_id: string }) => m.server_id) || [];
+
+    // Get rooms from those servers
+    let serverRoomsList: Room[] = [];
+    if (serverIds.length > 0) {
+      const { data: serverRooms, error: roomsError } = await supabaseAdminClient
+        .from('rooms')
+        .select('*')
+        .in('server_id', serverIds);
+
+      if (roomsError) {
+        throw parseDatabaseError(roomsError, `Failed to get server rooms for user ${userId}`);
+      }
+
+      serverRoomsList = (serverRooms || []) as Room[];
+    }
+
+    // Combine both sources
+    const explicitRooms = (memberRooms?.map((item: { rooms: Room }) => item.rooms).filter(Boolean) || []) as Room[];
+
+    // Remove duplicates by room ID
+    const roomMap = new Map<string, Room>();
+    [...explicitRooms, ...serverRoomsList].forEach((room) => {
+      if (room && room.id) {
+        roomMap.set(room.id, room);
+      }
+    });
+
+    return Array.from(roomMap.values());
   }
 }
 

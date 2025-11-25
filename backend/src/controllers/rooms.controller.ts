@@ -322,6 +322,92 @@ export async function getUserRooms(req: Request, res: Response): Promise<void> {
   }
 }
 
+export async function createRoomForServer(req: Request, res: Response): Promise<void> {
+  try {
+    const { id: serverId } = req.params; // Route parameter is 'id' from '/:id/rooms'
+    const { name, description } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    // Validate serverId format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(serverId)) {
+      res.status(400).json({ error: 'Invalid server ID format' });
+      return;
+    }
+
+    // Validate room name
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+      res.status(400).json({ error: 'Room name is required' });
+      return;
+    }
+
+    if (name.trim().length > 255) {
+      res.status(400).json({ error: 'Room name exceeds maximum length of 255 characters' });
+      return;
+    }
+
+    if (description && typeof description === 'string' && description.length > 5000) {
+      res.status(400).json({ error: 'Room description exceeds maximum length of 5000 characters' });
+      return;
+    }
+
+    // Check if server exists
+    const server = await serverService.getServerById(serverId);
+    if (!server) {
+      res.status(404).json({ error: 'Server not found' });
+      return;
+    }
+
+    // Check if user is a member of the server
+    const member = await supabaseService.getServerMember(serverId, userId);
+    
+    if (!member) {
+      res.status(403).json({ error: 'You are not a member of this server' });
+      return;
+    }
+
+    const dto: CreateRoomDto = {
+      name: name.trim(),
+      description: description?.trim() || undefined,
+      createdBy: userId,
+      serverId: serverId,
+    };
+
+    const room = await roomService.createRoom(dto);
+    res.status(201).json(room);
+  } catch (error) {
+    if (error instanceof ValidationError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (error instanceof ConflictError) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    if (error instanceof AuthorizationError) {
+      res.status(403).json({ error: error.message });
+      return;
+    }
+    if (error instanceof NotFoundError) {
+      res.status(404).json({ error: error.message });
+      return;
+    }
+    if (error instanceof DatabaseError) {
+      console.error('Error in createRoomForServer:', { serverId: req.params.id, userId: req.user?.id, error });
+      res.status(500).json({ error: error.message });
+      return;
+    }
+    console.error('Error in createRoomForServer:', { serverId: req.params.id, userId: req.user?.id, error });
+    const message = error instanceof Error ? error.message : 'Failed to create room for server';
+    res.status(500).json({ error: message });
+  }
+}
+
 export async function getRoomsByServer(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params; // Route parameter is 'id' from '/:id/rooms'

@@ -16,7 +16,6 @@ export function ChannelSettingsModal({
   onUpdate,
 }: ChannelSettingsModalProps) {
   const { getToken } = useAuth();
-  const [token, setToken] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,30 +23,32 @@ export function ChannelSettingsModal({
   const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
   useEffect(() => {
-    if (isOpen) {
-      getToken().then(setToken).catch(console.error);
-      if (room) {
-        setName(room.name);
-        setDescription(room.description || '');
-      }
+    if (isOpen && room) {
+      setName(room.name);
+      setDescription(room.description || '');
     }
-  }, [isOpen, room, getToken]);
+  }, [isOpen, room]);
 
   if (!isOpen || !room) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token) return;
-
+    
     setLoading(true);
     setError(null);
 
     try {
+      // Always get a fresh token before making the request
+      const freshToken = await getToken();
+      if (!freshToken) {
+        throw new Error('Not authenticated');
+      }
+
       const response = await fetch(`${API_URL}/api/rooms/${room.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${freshToken}`,
         },
         body: JSON.stringify({
           name: name.trim(),
@@ -70,7 +71,7 @@ export function ChannelSettingsModal({
   };
 
   const handleDelete = async () => {
-    if (!token || !confirm('Are you sure you want to delete this channel? This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to delete this channel? This action cannot be undone.')) {
       return;
     }
 
@@ -78,10 +79,16 @@ export function ChannelSettingsModal({
     setError(null);
 
     try {
+      // Always get a fresh token before making the request
+      const freshToken = await getToken();
+      if (!freshToken) {
+        throw new Error('Not authenticated');
+      }
+
       const response = await fetch(`${API_URL}/api/rooms/${room.id}`, {
         method: 'DELETE',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${freshToken}`,
         },
       });
 

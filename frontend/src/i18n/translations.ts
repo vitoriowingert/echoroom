@@ -43,6 +43,11 @@ export interface Translations {
     loading: string;
     selectServer: string;
     noServers: string;
+    discoverServers: string;
+    noServersFound: string;
+    joining: string;
+    joined: string;
+    join: string;
   };
 
   // Rooms
@@ -60,6 +65,7 @@ export interface Translations {
     directMessages: string;
     friends: string;
     textChannels: string;
+    uncategorized: string;
   };
 
   // Members
@@ -163,6 +169,11 @@ export const translations: Record<Language, Translations> = {
       loading: 'Loading servers...',
       selectServer: 'Select a server',
       noServers: 'No servers yet. Create one to get started!',
+      discoverServers: 'Discover Servers',
+      noServersFound: 'No servers found',
+      joining: 'Joining...',
+      joined: 'Joined',
+      join: 'Join Server',
     },
     rooms: {
       title: 'Rooms',
@@ -178,6 +189,7 @@ export const translations: Record<Language, Translations> = {
       directMessages: 'Direct Messages',
       friends: 'Friends',
       textChannels: 'Text Channels',
+      uncategorized: 'Uncategorized',
     },
     members: {
       onlineMembers: 'Online Members',
@@ -269,6 +281,11 @@ export const translations: Record<Language, Translations> = {
       loading: 'Carregando servidores...',
       selectServer: 'Selecione um servidor',
       noServers: 'Nenhum servidor ainda. Crie um para começar!',
+      discoverServers: 'Descobrir Servidores',
+      noServersFound: 'Nenhum servidor encontrado',
+      joining: 'Entrando...',
+      joined: 'Entrou',
+      join: 'Entrar no Servidor',
     },
     rooms: {
       title: 'Salas',
@@ -284,6 +301,7 @@ export const translations: Record<Language, Translations> = {
       directMessages: 'Mensagens diretas',
       friends: 'Amigos',
       textChannels: 'Canais de Texto',
+      uncategorized: 'Sem Categoria',
     },
     members: {
       onlineMembers: 'Membros Online',
@@ -375,6 +393,11 @@ export const translations: Record<Language, Translations> = {
       loading: 'Cargando servidores...',
       selectServer: 'Selecciona un servidor',
       noServers: 'Aún no hay servidores. ¡Crea uno para comenzar!',
+      discoverServers: 'Descubrir Servidores',
+      noServersFound: 'No se encontraron servidores',
+      joining: 'Uniéndose...',
+      joined: 'Unido',
+      join: 'Unirse al Servidor',
     },
     rooms: {
       title: 'Salas',
@@ -390,6 +413,7 @@ export const translations: Record<Language, Translations> = {
       directMessages: 'Mensajes Directos',
       friends: 'Amigos',
       textChannels: 'Canales de Texto',
+      uncategorized: 'Sin Categoría',
     },
     members: {
       onlineMembers: 'Miembros En Línea',
@@ -481,6 +505,11 @@ export const translations: Record<Language, Translations> = {
       loading: 'Chargement des serveurs...',
       selectServer: 'Sélectionnez un serveur',
       noServers: 'Aucun serveur pour le moment. Créez-en un pour commencer !',
+      discoverServers: 'Découvrir les Serveurs',
+      noServersFound: 'Aucun serveur trouvé',
+      joining: 'Rejoindre...',
+      joined: 'Rejoint',
+      join: 'Rejoindre le Serveur',
     },
     rooms: {
       title: 'Salles',
@@ -496,6 +525,7 @@ export const translations: Record<Language, Translations> = {
       directMessages: 'Messages Directs',
       friends: 'Amis',
       textChannels: 'Canaux Textuels',
+      uncategorized: 'Sans Catégorie',
     },
     members: {
       onlineMembers: 'Membres En Ligne',

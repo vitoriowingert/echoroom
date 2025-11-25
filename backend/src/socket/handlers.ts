@@ -7,6 +7,7 @@ import { presenceService } from '../services/presence.service';
 import { reactionService } from '../services/reaction.service';
 import { unreadService } from '../services/unread.service';
 import { registerVoiceEvents } from './voice.handlers';
+import { supabaseService } from '../services/supabase.service';
 
 export function setupSocketIO(io: SocketIOServer): void {
   // Apply authentication middleware
@@ -43,8 +44,34 @@ export function setupSocketIO(io: SocketIOServer): void {
           return;
         }
 
-        // Add user to room if not already a member
-        await roomService.joinRoom(roomId, userId);
+        // Check if user has access to this room
+        let hasAccess = false;
+        
+        // Check if user is an explicit room member
+        const roomMember = await supabaseService.getRoomMember(roomId, userId);
+        if (roomMember) {
+          hasAccess = true;
+        }
+        
+        // If room belongs to a server, check if user is a server member
+        if (!hasAccess && room.server_id) {
+          const serverMember = await supabaseService.getServerMember(room.server_id, userId);
+          if (serverMember) {
+            hasAccess = true;
+            // Add user to room_members for consistency (idempotent)
+            try {
+              await roomService.joinRoom(roomId, userId);
+            } catch (error) {
+              // Ignore errors - user can still join Socket.IO room as server member
+              console.log(`Note: Could not add user ${userId} to room_members for room ${roomId}, but allowing Socket.IO join as server member`);
+            }
+          }
+        }
+
+        if (!hasAccess) {
+          socket.emit('error', { message: 'You do not have access to this room' });
+          return;
+        }
 
         // Join socket room
         socket.join(roomId);

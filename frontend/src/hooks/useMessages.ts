@@ -3,6 +3,7 @@ import { Message } from '../types';
 import { Socket } from 'socket.io-client';
 import { soundService } from '../services/sound.service';
 import { notificationService } from '../services/notification.service';
+import { useAuth } from './useAuth';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
@@ -21,6 +22,7 @@ export function useMessages(
   token: string | null,
   options: UseMessagesOptions = {}
 ) {
+  const { getToken } = useAuth();
   const { currentUserId, soundEnabled = true, notificationsEnabled = true, currentRoomName, messageUsers, onNewMessage } = options;
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,8 +56,8 @@ export function useMessages(
     onNewMessageRef.current = onNewMessage;
   }, [onNewMessage]);
 
-  const fetchMessages = useCallback(async () => {
-    if (!roomId || !token) return;
+  const fetchMessages = useCallback(async (currentToken: string | null = token) => {
+    if (!roomId || !currentToken) return;
 
     setLoading(true);
     setError(null);
@@ -63,11 +65,20 @@ export function useMessages(
     try {
       const response = await fetch(`${API_URL}/api/rooms/${roomId}/messages`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${currentToken}`,
         },
       });
 
       if (!response.ok) {
+        // If token expired, try to get a fresh one and retry once
+        if (response.status === 401) {
+          const freshToken = await getToken();
+          if (freshToken && freshToken !== currentToken) {
+            // Retry with fresh token - await to ensure finally executes after retry completes
+            await fetchMessages(freshToken);
+            return;
+          }
+        }
         throw new Error('Falha ao buscar mensagens');
       }
 
@@ -78,7 +89,7 @@ export function useMessages(
     } finally {
       setLoading(false);
     }
-  }, [roomId, token]);
+  }, [roomId, token, getToken]);
 
   const sendMessage = useCallback(
     async (content: string, fileUrl?: string, fileName?: string, fileSize?: number, fileType?: string) => {

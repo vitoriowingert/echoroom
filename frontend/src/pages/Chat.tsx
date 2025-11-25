@@ -33,8 +33,139 @@ export function Chat() {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
-  const { servers, loading: serversLoading, createServer, joinServer, discoverServers } = useServers(token);
-  const { rooms, loading: roomsLoading, createRoom } = useRooms(token, selectedServerId);
+  const { servers, loading: serversLoading, fetchServers } = useServers(token);
+  
+  // Wrap all server operations to always get fresh tokens
+  const createServer = useCallback(async (name: string, description?: string, iconUrl?: string) => {
+    const freshToken = await getToken();
+    if (!freshToken) {
+      throw new Error('Not authenticated');
+    }
+    
+    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/servers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${freshToken}`,
+      },
+      body: JSON.stringify({ name, description, iconUrl }),
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'Failed to create server';
+      try {
+        const error = await response.json();
+        errorMessage = error.error || errorMessage;
+      } catch {
+        // If response is not JSON, use status text
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const newServer = await response.json();
+    // Refresh servers list to show the newly created server
+    await fetchServers(freshToken);
+    return newServer;
+  }, [getToken, fetchServers]);
+
+  const joinServer = useCallback(async (serverId: string) => {
+    const freshToken = await getToken();
+    if (!freshToken) {
+      throw new Error('Not authenticated');
+    }
+    
+    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/servers/${serverId}/join`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${freshToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'Failed to join server';
+      try {
+        const error = await response.json();
+        errorMessage = error.error || errorMessage;
+      } catch {
+        // If response is not JSON, use status text
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+    
+    // Refresh servers list to show the newly joined server
+    await fetchServers(freshToken);
+  }, [getToken, fetchServers]);
+  
+  // Wrap discoverServers to always get a fresh token
+  const discoverServers = useCallback(async () => {
+    const freshToken = await getToken();
+    if (!freshToken) {
+      throw new Error('Not authenticated');
+    }
+    
+    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/servers/discover`, {
+      headers: {
+        Authorization: `Bearer ${freshToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'Failed to discover servers';
+      try {
+        const error = await response.json();
+        errorMessage = error.error || errorMessage;
+      } catch {
+        // If response is not JSON, use status text
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    return await response.json();
+  }, [getToken]);
+  
+  const { rooms, loading: roomsLoading, fetchRooms } = useRooms(token, selectedServerId);
+  
+  // Wrap createRoom to always get a fresh token
+  const createRoom = useCallback(async (name: string, description?: string, serverId?: string) => {
+    const freshToken = await getToken();
+    if (!freshToken) {
+      throw new Error('Not authenticated');
+    }
+    
+    const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+    const url = serverId 
+      ? `${API_URL}/api/servers/${serverId}/rooms`
+      : `${API_URL}/api/rooms`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${freshToken}`,
+      },
+      body: JSON.stringify({ name, description }),
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'Failed to create room';
+      try {
+        const error = await response.json();
+        errorMessage = error.error || errorMessage;
+      } catch {
+        // If response is not JSON, use status text
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const newRoom = await response.json();
+    // Refresh rooms list to show the newly created room
+    await fetchRooms(freshToken);
+    return newRoom;
+  }, [getToken, fetchRooms]);
   const { profile } = useProfile();
   
   // Initialize notifications hook
@@ -105,9 +236,15 @@ export function Chat() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedRoomId, isSearchOpen]);
 
+  // Token management with periodic refresh to prevent expiration
   useEffect(() => {
+    if (!user) {
+      setToken(null);
+      return;
+    }
+
     const fetchToken = async () => {
-      if (user) {
+      try {
         const t = await getToken();
         if (t) {
           setToken(t);
@@ -116,11 +253,20 @@ export function Chat() {
           console.warn('No token available, user might need to re-authenticate');
           setToken(null);
         }
-      } else {
+      } catch (error) {
+        console.error('Error fetching token:', error);
         setToken(null);
       }
     };
+
+    // Fetch immediately
     fetchToken();
+
+    // Refresh token every 4 minutes to prevent expiration
+    // Tokens typically last 1 hour, refreshing every 4 min ensures freshness
+    const interval = setInterval(fetchToken, 4 * 60 * 1000);
+
+    return () => clearInterval(interval);
   }, [user, getToken]);
 
   useEffect(() => {
@@ -141,9 +287,10 @@ export function Chat() {
     }
   }, [profile?.preferences?.notifications]);
 
-  // Track joined rooms to avoid re-joining
+ // Track joined rooms to avoid re-joining
   const joinedRoomsRef = useRef<Set<string>>(new Set());
   const roomsRef = useRef<Room[]>([]);
+  const allUserRoomsRef = useRef<Room[]>([]); // All rooms user has access to (for Socket.IO joining)
   const messageUsersRef = useRef<Map<string, { username?: string; email?: string }>>(new Map());
   const profileRef = useRef(profile);
   const selectedRoomIdRef = useRef(selectedRoomId);
@@ -168,14 +315,71 @@ export function Chat() {
   // Stable callback for adding notifications
   const handleAddNotification = useCallback(
     (message: Message, username: string) => {
-      const messageRoom = roomsRef.current.find((r) => r.id === message.room_id);
+      // Check both server-specific rooms and all user rooms for room name
+      const messageRoom = roomsRef.current.find((r) => r.id === message.room_id) 
+        || allUserRoomsRef.current.find((r) => r.id === message.room_id);
       console.log('handleAddNotification called:', { roomId: message.room_id, username, roomName: messageRoom?.name });
       addNotification(message, username, messageRoom?.name);
     },
     [addNotification]
   );
 
-  // Separate effect to handle room joining (runs when rooms change)
+  // Fetch all user rooms (for Socket.IO joining) - separate from server-specific rooms
+  // This ensures users receive notifications from all rooms they have access to, regardless of which server they're viewing
+  useEffect(() => {
+    if (!token || !socket) return;
+
+    // Set up error handlers once
+    const handleJoinedRoom = (data: { roomId: string }) => {
+      console.log('✅ Successfully joined Socket.IO room:', data.roomId);
+    };
+    
+    const handleJoinError = (error: { message: string }) => {
+      console.error('❌ Socket.IO error:', error.message);
+    };
+    
+    socket.on('joined_room', handleJoinedRoom);
+    socket.on('error', handleJoinError);
+
+    const fetchAllUserRooms = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/rooms/my-rooms`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const allRooms: Room[] = await response.json();
+          allUserRoomsRef.current = allRooms;
+          console.log('📥 Fetched all user rooms:', allRooms.length, 'Room IDs:', allRooms.map(r => r.id));
+          
+          // Join all rooms in Socket.IO
+          const roomsToJoin = allRooms.filter((room) => !joinedRoomsRef.current.has(room.id));
+          roomsToJoin.forEach((room) => {
+            socket.emit('join_room', room.id);
+            joinedRoomsRef.current.add(room.id);
+            console.log('📤 Attempting to join Socket.IO room:', room.id, room.name);
+          });
+        } else {
+          console.warn('Failed to fetch all user rooms:', response.status);
+        }
+      } catch (error) {
+        console.error('Error fetching all user rooms:', error);
+      }
+    };
+
+    fetchAllUserRooms();
+    
+    // Cleanup listeners when component unmounts or effect re-runs
+    return () => {
+      socket.off('joined_room', handleJoinedRoom);
+      socket.off('error', handleJoinError);
+    };
+  }, [socket, token, servers]); // Also refresh when servers change (e.g., user joins a new server)
+
+  // Separate effect to handle room joining for server-specific rooms (for display)
+  // This ensures we also join rooms when they're added to the current server view
   useEffect(() => {
     if (!socket || !token || rooms.length === 0) return;
 
@@ -184,16 +388,11 @@ export function Chat() {
     roomsToJoin.forEach((room) => {
       socket.emit('join_room', room.id);
       joinedRoomsRef.current.add(room.id);
+      console.log('✅ Joined Socket.IO room (from server view):', room.id, room.name);
     });
 
-    // Remove rooms that no longer exist
-    const currentRoomIds = new Set(rooms.map((r) => r.id));
-    joinedRoomsRef.current.forEach((roomId) => {
-      if (!currentRoomIds.has(roomId)) {
-        socket.emit('leave_room', roomId);
-        joinedRoomsRef.current.delete(roomId);
-      }
-    });
+    // Note: We don't leave rooms when they're removed from server view
+    // because the user might still have access to them from other servers
   }, [socket, token, rooms]);
 
   // Global listener for messages from all rooms (register once, not on every rooms change)
@@ -232,8 +431,9 @@ export function Chat() {
           }
         }
 
-        // Get room name
-        const messageRoom = roomsRef.current.find((r) => r.id === message.room_id);
+        // Get room name - check both server-specific rooms and all user rooms
+        const messageRoom = roomsRef.current.find((r) => r.id === message.room_id) 
+          || allUserRoomsRef.current.find((r) => r.id === message.room_id);
 
         // Add to notifications (this will handle filtering if we're viewing that room)
         console.log('Global listener: Adding notification for room:', message.room_id, 'Current selectedRoomId:', selectedRoomIdRef.current);
@@ -414,8 +614,9 @@ export function Chat() {
                 roomId={selectedRoomId || undefined}
                 onEditMessage={handleUpdateMessage}
                 onDeleteMessage={handleDeleteMessage}
-                onPinMessage={(messageId) => {
+                onPinMessage={(_messageId) => {
                   // Trigger refresh of pinned messages modal if it's open
+                  // _messageId is provided by MessageItem but not needed here
                   if (isPinnedMessagesOpen) {
                     setPinnedMessagesRefreshTrigger((prev) => prev + 1);
                   }
@@ -468,7 +669,6 @@ export function Chat() {
         isOpen={isPinnedMessagesOpen}
         onClose={() => setIsPinnedMessagesOpen(false)}
         roomId={selectedRoomId}
-        token={token}
         users={messageUsers}
         refreshTrigger={pinnedMessagesRefreshTrigger}
         onMessageClick={(messageId) => {
